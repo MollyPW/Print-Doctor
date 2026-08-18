@@ -1,0 +1,909 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Print Doctor — faded photo diagnosis</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,800&family=Instrument+Sans:wght@400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --paper:#F2EBEC;
+    --paper-deep:#E7DBDE;
+    --ink:#1B1418;
+    --ink-soft:#5C4E53;
+    --rule:#CBB8BD;
+    --dye-c:#0F8B9E;
+    --dye-m:#C2358B;
+    --dye-y:#C99215;
+    --ok:#2E7D5B;
+    --display:"Bricolage Grotesque","Arial Black",system-ui,sans-serif;
+    --body:"Instrument Sans","Segoe UI",system-ui,sans-serif;
+    --mono:"DM Mono","Consolas",ui-monospace,monospace;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{
+    background:var(--paper);
+    color:var(--ink);
+    font-family:var(--body);
+    font-size:16px;
+    line-height:1.55;
+    -webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:940px;margin:0 auto;padding:32px 20px 96px}
+
+  /* ---------- header ---------- */
+  .masthead{border-bottom:2px solid var(--ink);padding-bottom:18px;margin-bottom:34px}
+  .eyebrow{
+    font-family:var(--mono);font-size:11px;letter-spacing:.16em;text-transform:uppercase;
+    color:var(--ink-soft);margin:0 0 10px
+  }
+  h1{
+    font-family:var(--display);font-weight:800;font-size:clamp(38px,7vw,68px);
+    line-height:.92;letter-spacing:-.03em;margin:0 0 12px;
+  }
+  h1 .swatch{display:inline-block;width:.42em;height:.42em;border-radius:50%;vertical-align:.06em;margin-left:.08em}
+  .lede{max-width:56ch;margin:0;color:var(--ink-soft);font-size:17px}
+
+  /* ---------- generic blocks ---------- */
+  .panel{
+    background:#fff;border:1px solid var(--rule);border-radius:2px;
+    padding:22px;margin-bottom:20px
+  }
+  .panel-head{
+    font-family:var(--mono);font-size:11px;letter-spacing:.16em;text-transform:uppercase;
+    color:var(--ink-soft);margin:0 0 16px;display:flex;justify-content:space-between;gap:12px;align-items:baseline
+  }
+  h2{font-family:var(--display);font-weight:800;font-size:26px;letter-spacing:-.02em;margin:0 0 10px;line-height:1.1}
+  h3{font-family:var(--display);font-weight:500;font-size:19px;letter-spacing:-.01em;margin:0 0 6px;line-height:1.2}
+  p{margin:0 0 12px}
+  .muted{color:var(--ink-soft)}
+  .small{font-size:14px}
+
+  /* ---------- drop zone ---------- */
+  .drop{
+    border:2px dashed var(--rule);border-radius:3px;background:#fff;
+    padding:52px 24px;text-align:center;cursor:pointer;display:block;width:100%;
+    font:inherit;color:inherit;transition:border-color .18s,background .18s
+  }
+  .drop:hover,.drop:focus-visible{border-color:var(--dye-m);background:#fffdfe}
+  .drop.over{border-color:var(--dye-m);background:#FCF3F8}
+  .drop-title{font-family:var(--display);font-weight:800;font-size:24px;letter-spacing:-.02em;display:block;margin-bottom:8px}
+  .drop-sub{color:var(--ink-soft);font-size:15px}
+
+  /* ---------- image frame ---------- */
+  .exam{display:grid;grid-template-columns:1fr 1fr;gap:20px;align-items:start}
+  @media (max-width:760px){.exam{grid-template-columns:1fr}}
+  .frame{background:#fff;border:1px solid var(--rule);padding:12px 12px 0;border-radius:2px}
+  .frame canvas{display:block;width:100%;height:auto;background:var(--paper-deep)}
+  .frame-bar{display:flex;gap:6px;padding:12px 0;align-items:center;flex-wrap:wrap}
+  .seg{display:inline-flex;border:1px solid var(--ink);border-radius:2px;overflow:hidden}
+  .seg button{
+    font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;
+    background:#fff;border:0;padding:8px 12px;cursor:pointer;color:var(--ink)
+  }
+  .seg button[aria-pressed="true"]{background:var(--ink);color:var(--paper)}
+  .filename{font-family:var(--mono);font-size:11px;color:var(--ink-soft);margin-left:auto;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%}
+
+  /* ---------- context controls ---------- */
+  .ctx{display:grid;grid-template-columns:1fr 1fr;gap:12px;padding-bottom:18px;margin-bottom:18px;border-bottom:1px solid var(--rule)}
+  @media (max-width:560px){.ctx{grid-template-columns:1fr}}
+  .ctx label{display:block;font-family:var(--mono);font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-soft);margin-bottom:5px}
+  .ctx select{
+    width:100%;font-family:var(--body);font-size:14.5px;color:var(--ink);background:#fff;
+    border:1px solid var(--rule);border-radius:2px;padding:9px 10px;cursor:pointer
+  }
+  .ctx select:hover{border-color:var(--ink)}
+  .ctx .full{grid-column:1/-1}
+
+  /* ---------- diagnosis (signature) ---------- */
+  .verdict-head{display:flex;gap:14px;align-items:flex-start;margin-bottom:16px}
+  .cast-chip{width:48px;height:48px;border-radius:2px;flex:0 0 auto;border:1px solid rgba(0,0,0,.18)}
+  .verdict-title{font-family:var(--display);font-weight:800;font-size:23px;line-height:1.12;letter-spacing:-.02em;margin:0}
+  .verdict-sub{font-family:var(--mono);font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-soft);margin:7px 0 0}
+  .why-h{font-family:var(--mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-soft);margin:0 0 6px}
+
+  .layers{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+  @media (max-width:760px){.layers{grid-template-columns:1fr}}
+  .layer{border:1px solid var(--rule);border-radius:2px;padding:16px}
+  .layer-name{font-family:var(--display);font-weight:800;font-size:17px;margin:0 0 3px;letter-spacing:-.01em}
+  .layer-job{font-size:13.5px;color:var(--ink-soft);margin:0 0 12px}
+  .status{font-family:var(--mono);font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;padding:4px 8px;border-radius:2px;display:inline-block;margin-bottom:14px}
+  .status.bad{background:#F7E3EE;color:#96256B}
+  .status.mid{background:#FBF0DC;color:#8A6110}
+  .status.good{background:#E2F0E9;color:var(--ok)}
+  .track{position:relative;height:14px;background:#fff;border:1px solid var(--rule);border-radius:1px;overflow:hidden}
+  .lost{position:absolute;top:0;bottom:0;background:repeating-linear-gradient(45deg,#D9CACE,#D9CACE 3px,#F0E6E8 3px,#F0E6E8 6px)}
+  .fill{position:absolute;top:0;bottom:0;transition:left .7s cubic-bezier(.2,.8,.2,1),right .7s cubic-bezier(.2,.8,.2,1)}
+  .fill.c{background:var(--dye-c)} .fill.m{background:var(--dye-m)} .fill.y{background:var(--dye-y)}
+  .track-cap{display:flex;justify-content:space-between;font-family:var(--mono);font-size:10px;color:var(--ink-soft);margin-top:5px}
+  .layer-plain{font-size:14px;line-height:1.55;margin:12px 0 0}
+  .evidence{margin-top:24px;border-top:1px solid var(--rule);padding-top:18px}
+  .evidence .row{font-family:var(--mono);font-size:12.5px;color:var(--ink-soft);margin-bottom:6px}
+
+  /* ---------- recipe cards ---------- */
+  .step{border-top:1px solid var(--rule);padding:20px 0}
+  .step:first-of-type{border-top:0;padding-top:4px}
+  .step-n{
+    font-family:var(--mono);font-size:11px;letter-spacing:.14em;color:var(--dye-m);
+    display:block;margin-bottom:6px
+  }
+  .howto{
+    background:var(--paper);border-left:3px solid var(--ink);padding:12px 14px;margin-top:10px;
+    font-family:var(--mono);font-size:13.5px;line-height:1.6;white-space:pre-wrap
+  }
+  .check{margin-top:8px;font-size:14px;color:var(--ok)}
+  .check::before{content:"→ ";font-family:var(--mono)}
+
+  /* ---------- buttons ---------- */
+  .btn{
+    font-family:var(--display);font-weight:800;font-size:16px;letter-spacing:-.01em;
+    background:var(--ink);color:var(--paper);border:0;border-radius:2px;
+    padding:14px 22px;cursor:pointer;transition:transform .1s
+  }
+  .btn:hover{transform:translateY(-1px)}
+  .btn:disabled{opacity:.45;cursor:not-allowed;transform:none}
+  .btn.ghost{background:transparent;color:var(--ink);border:1px solid var(--ink);font-weight:500;font-size:14px;padding:10px 16px}
+  .actions{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:6px}
+  :focus-visible{outline:2px solid var(--dye-m);outline-offset:2px}
+
+  .hidden{display:none !important}
+  .note{font-size:13.5px;color:var(--ink-soft);margin-top:10px}
+  .err{border-left:3px solid var(--dye-m);padding:10px 14px;background:#fff;font-size:14px}
+  .loading{font-family:var(--mono);font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-soft)}
+  .dots::after{content:"";animation:d 1.2s steps(4,end) infinite}
+  @keyframes d{0%{content:""}25%{content:"."}50%{content:".."}75%{content:"..."}}
+  @media (prefers-reduced-motion:reduce){*{animation:none !important;transition:none !important}}
+  footer{margin-top:40px;padding-top:16px;border-top:1px solid var(--rule);font-size:13px;color:var(--ink-soft)}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="masthead">
+    <p class="eyebrow">Faded print diagnosis · 1940s to now</p>
+    <h1>Print Doctor<span class="swatch" style="background:var(--dye-m)"></span></h1>
+    <p class="lede">Drop in a scan of an old photo. This measures what the dye layers have lost, then writes you the exact repair steps — with real numbers to type into Photoshop or GIMP.</p>
+  </header>
+
+  <button class="drop" id="drop" type="button">
+    <span class="drop-title">Choose a photo</span>
+    <span class="drop-sub">or drag one here · JPG, PNG, TIFF, HEIC · nothing leaves your PC except a small copy sent for the write-up</span>
+  </button>
+  <input type="file" id="file" accept="image/*" class="hidden">
+
+  <div id="stage" class="hidden">
+
+    <div class="exam" style="margin-top:22px">
+      <div class="frame">
+        <canvas id="cv" width="600" height="400"></canvas>
+        <div class="frame-bar">
+          <div class="seg" role="group" aria-label="Preview mode">
+            <button type="button" id="viewOrig" aria-pressed="true">As scanned</button>
+            <button type="button" id="viewFix" aria-pressed="false">Rebalanced</button>
+          </div>
+          <span class="filename" id="fname"></span>
+        </div>
+      </div>
+
+      <div class="panel" style="margin:0">
+        <p class="panel-head"><span>Diagnosis</span><span id="dyeStamp"></span></p>
+        <div class="ctx">
+          <div>
+            <label for="era">Roughly when was it taken?</label>
+            <select id="era">
+              <option value="unknown" selected>Not sure</option>
+              <option value="pre1950">Before 1950</option>
+              <option value="1950s">1950s</option>
+              <option value="1960s">1960s</option>
+              <option value="1970s">1970s</option>
+              <option value="1980s">1980s</option>
+              <option value="1990s">1990s or later</option>
+            </select>
+          </div>
+          <div>
+            <label for="store">Where has it been kept?</label>
+            <select id="store">
+              <option value="unknown" selected>Not sure</option>
+              <option value="dark">Album, box or drawer</option>
+              <option value="displayed">Framed or hung on a wall</option>
+              <option value="hot">Attic, basement or garage</option>
+            </select>
+          </div>
+          <div class="full">
+            <label for="kind">What kind of print is it?</label>
+            <select id="kind">
+              <option value="auto" selected>Work it out from the scan</option>
+              <option value="color">Color print</option>
+              <option value="bw">Black-and-white print</option>
+            </select>
+          </div>
+        </div>
+        <div class="verdict-head">
+          <span class="cast-chip" id="castChip"></span>
+          <div>
+            <p class="verdict-title" id="castTitle">Reading the print…</p>
+            <p class="verdict-sub" id="castSub"></p>
+          </div>
+        </div>
+        <div id="whyBlock"></div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <p class="panel-head"><span id="layersHead">The three dye layers</span><span>what each one is doing now</span></p>
+      <p class="small muted" id="layersIntro" style="max-width:66ch;margin-bottom:20px">A color print isn't one picture. It's three see-through layers of dye stacked on white paper, and each layer has exactly one job: to subtract one color of light before it bounces back to your eye. The three dyes were never equally stable, so they don't fade at the same rate — and whichever one gives out first decides what color the whole photo drifts toward.</p>
+      <div class="layers" id="layers"></div>
+      <div class="evidence" id="evidence"></div>
+    </div>
+
+    <div class="panel">
+      <p class="panel-head"><span>Do this first</span><span>measured, not guessed</span></p>
+      <h2>Per-channel black and white points</h2>
+      <p class="small muted">These four numbers per channel fix most of the color cast in one move. Open Levels, switch to the single channel named, and type the two values into the left and right input boxes.</p>
+      <div class="howto" id="levelsBlock"></div>
+      <div class="actions">
+        <button class="btn ghost" type="button" id="copyLevels">Copy these numbers</button>
+      </div>
+    </div>
+
+    <div class="panel">
+      <p class="panel-head"><span>Full repair plan</span><span id="planStamp"></span></p>
+      <h2>Get the step-by-step</h2>
+      <p class="small muted" style="max-width:60ch">This sends a small copy of the photo plus the measurements above and gets back an ordered repair sequence written for your app. Order matters — color first, damage second, sharpening last.</p>
+      <div class="actions">
+        <div class="seg" role="group" aria-label="Which app">
+          <button type="button" id="appPS" aria-pressed="true">Photoshop</button>
+          <button type="button" id="appGimp" aria-pressed="false">GIMP</button>
+        </div>
+        <button class="btn" type="button" id="run">Write my repair plan</button>
+        <span class="loading hidden" id="busy">Reading the print<span class="dots"></span></span>
+      </div>
+      <div id="err" class="err hidden" style="margin-top:14px"></div>
+    </div>
+
+    <div class="panel hidden" id="results">
+      <p class="panel-head"><span>Repair plan</span><span id="appStamp">Photoshop</span></p>
+      <div id="diagnosis"></div>
+      <div id="steps"></div>
+      <div class="actions" style="margin-top:18px">
+        <button class="btn ghost" type="button" id="copyPlan">Copy the whole plan</button>
+        <button class="btn ghost" type="button" id="again">Start over with another photo</button>
+      </div>
+    </div>
+
+  </div>
+
+  <footer>
+    Preview rendering is a rough guide at screen size only. Do the real edit on the full-resolution file in your photo app, and always work on a copy — never the original scan.
+  </footer>
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  var state = { img:null, stats:null, name:"", b64:null, app:"photoshop", plan:null, view:"orig",
+                era:"unknown", store:"unknown", kind:"auto" };
+
+  var $ = function(id){ return document.getElementById(id); };
+  var drop = $("drop"), fileInput = $("file"), stage = $("stage"), cv = $("cv"), ctx = cv.getContext("2d");
+
+  /* ---------------- file intake ---------------- */
+  drop.addEventListener("click", function(){ fileInput.click(); });
+  fileInput.addEventListener("change", function(e){
+    if(e.target.files && e.target.files[0]) load(e.target.files[0]);
+  });
+  ["dragenter","dragover"].forEach(function(ev){
+    drop.addEventListener(ev, function(e){ e.preventDefault(); drop.classList.add("over"); });
+  });
+  ["dragleave","drop"].forEach(function(ev){
+    drop.addEventListener(ev, function(e){ e.preventDefault(); drop.classList.remove("over"); });
+  });
+  drop.addEventListener("drop", function(e){
+    var f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+    if(f) load(f);
+  });
+
+  function load(file){
+    if(!file.type || file.type.indexOf("image") !== 0){
+      showErr("That file is not an image this browser can open. Try a JPG, PNG or TIFF export of the scan.");
+      return;
+    }
+    state.name = file.name;
+    var reader = new FileReader();
+    reader.onload = function(){
+      var img = new Image();
+      img.onload = function(){
+        state.img = img;
+        state.stats = measure(img);
+        state.b64 = shrink(img);
+        state.plan = null;
+        $("results").classList.add("hidden");
+        hideErr();
+        stage.classList.remove("hidden");
+        $("fname").textContent = state.name;
+        $("dyeStamp").textContent = img.width + " × " + img.height;
+        renderDiagnosis();
+        renderLevels();
+        setView("orig");
+        $("run").disabled = false;
+        $("run").textContent = "Write my repair plan";
+        stage.scrollIntoView({behavior:"smooth", block:"start"});
+      };
+      img.onerror = function(){ showErr("This browser could not decode that image. Open it in Photos and save a JPG copy, then try again."); };
+      img.src = reader.result;
+    };
+    reader.onerror = function(){ showErr("The file could not be read. Check it is not still syncing to OneDrive, then try again."); };
+    reader.readAsDataURL(file);
+  }
+
+  /* ---------------- measurement ---------------- */
+  function measure(img){
+    var MAX = 800;
+    var s = Math.min(1, MAX / Math.max(img.width, img.height));
+    var w = Math.max(1, Math.round(img.width * s)), h = Math.max(1, Math.round(img.height * s));
+    var c = document.createElement("canvas"); c.width = w; c.height = h;
+    var x = c.getContext("2d", {willReadFrequently:true});
+    x.drawImage(img, 0, 0, w, h);
+    var d;
+    try { d = x.getImageData(0,0,w,h).data; }
+    catch(e){ return null; }
+
+    var hist = [new Uint32Array(256), new Uint32Array(256), new Uint32Array(256)];
+    var lhist = new Uint32Array(256);
+    var hue = new Uint32Array(36);
+    var colored = 0;
+    var n = 0, sat = 0, sum = [0,0,0];
+    var i, r, g, b, mx, mn, l;
+
+    for(i=0; i<d.length; i+=4){
+      r = d[i]; g = d[i+1]; b = d[i+2];
+      hist[0][r]++; hist[1][g]++; hist[2][b]++;
+      sum[0]+=r; sum[1]+=g; sum[2]+=b;
+      mx = r>g ? (r>b?r:b) : (g>b?g:b);
+      mn = r<g ? (r<b?r:b) : (g<b?g:b);
+      l = (mx+mn)/2;
+      lhist[Math.round(0.299*r + 0.587*g + 0.114*b)]++;
+      if(mx !== mn){ sat += (l > 127.5) ? (mx-mn)/(510-mx-mn) : (mx-mn)/(mx+mn); }
+      if(mx - mn > 16){
+        var sp = mx - mn, hh;
+        if(mx === r) hh = (g - b) / sp;
+        else if(mx === g) hh = (b - r) / sp + 2;
+        else hh = (r - g) / sp + 4;
+        hh *= 60; if(hh < 0) hh += 360;
+        hue[Math.min(35, Math.floor(hh / 10))]++;
+        colored++;
+      }
+      n++;
+    }
+
+    /* how tightly is all the colour packed into one hue? a stained
+       black-and-white print is one tone; a colour photo is many */
+    var band = 0;
+    for(var b0=0; b0<36; b0++){
+      var s2 = 0;
+      for(var q=0; q<5; q++){ s2 += hue[(b0+q) % 36]; }
+      if(s2 > band) band = s2;
+    }
+    var concentration = colored ? band / colored : 1;
+    var colouredFrac = colored / n;
+
+    var ch = [clip(hist[0], n), clip(hist[1], n), clip(hist[2], n)];
+    var loCut = pct(lhist, n, 0.10), hiCut = pct(lhist, n, 0.90);
+
+    var sh = [0,0,0], shN = 0, hl = [0,0,0], hlN = 0;
+    for(i=0; i<d.length; i+=4){
+      r = d[i]; g = d[i+1]; b = d[i+2];
+      l = 0.299*r + 0.587*g + 0.114*b;
+      if(l <= loCut){ sh[0]+=r; sh[1]+=g; sh[2]+=b; shN++; }
+      else if(l >= hiCut){ hl[0]+=r; hl[1]+=g; hl[2]+=b; hlN++; }
+    }
+    var avg = function(a, k){ return k ? [Math.round(a[0]/k), Math.round(a[1]/k), Math.round(a[2]/k)] : [0,0,0]; };
+
+    return {
+      w: img.width, h: img.height,
+      levels: ch,
+      mean: [Math.round(sum[0]/n), Math.round(sum[1]/n), Math.round(sum[2]/n)],
+      shadow: avg(sh, shN),
+      highlight: avg(hl, hlN),
+      saturation: Math.round((sat/n) * 100),
+      looksMono: (colouredFrac < 0.10) || (concentration > 0.90)
+    };
+  }
+
+  function clip(h, total){
+    var t = total * 0.002, acc = 0, lo = 0, hi = 255, i;
+    for(i=0;i<256;i++){ acc += h[i]; if(acc >= t){ lo = i; break; } }
+    acc = 0;
+    for(i=255;i>=0;i--){ acc += h[i]; if(acc >= t){ hi = i; break; } }
+    if(hi <= lo) hi = Math.min(255, lo + 1);
+    return [lo, hi];
+  }
+  function pct(h, total, p){
+    var t = total * p, acc = 0, i;
+    for(i=0;i<256;i++){ acc += h[i]; if(acc >= t) return i; }
+    return 255;
+  }
+
+  /* ---------------- era knowledge ---------------- */
+  var ERA = {
+    pre1950: "Almost every family snapshot before 1950 is black-and-white. Color print material existed from 1942, but it was expensive, rare, and unstable from the day it left the lab. On a print this old, discoloration is usually the paper and the silver image aging rather than dye layers failing.",
+    "1950s": "A color print from the 1950s is on <strong>fiber-base paper</strong> — resin-coated paper didn't arrive until around 1968 — and the paper is part of the problem. Fiber paper soaks up processing chemistry and is genuinely hard to wash clean, so whatever fixer stayed behind kept working on the image for the next seventy years. The dye sets of this decade were also the least stable ever sold to the public: Kodacolor prints were fading noticeably within a few years and customers complained about it at the time. The typical result is heavy overall density loss drifting toward yellow or orange-brown, plus the paper base itself yellowing underneath — a different failure from the clean magenta shift you see on 1970s prints. One-hour labs did not exist yet, so this went away to Kodak or an independent lab and came back a week or two later.",
+    "1960s": "The 1960s are a transition. Most of the decade is still fiber-base paper with the same washing problem, and resin-coated paper only appears right at the end. Dye stability was improving but was still poor by modern standards, so prints from this decade drift either yellow-brown like a 1950s print or magenta like a 1970s one, depending on the exact paper and how it was stored.",
+    "1970s": "This is the best-documented dye failure in consumer photography. The resin-coated papers of the 1970s used a cyan dye that broke down far faster than the other two, which is why so much of that decade has gone magenta. Prints still went out to a lab through the drugstore counter or by mail — one-hour minilabs didn't arrive until the early 1980s — and washing was rarely to archival standard.",
+    "1980s": "The 1980s split in half. Early in the decade, one-hour minilabs spread everywhere and often ran on tired chemistry that was replenished on a schedule rather than when it needed it. From around the middle of the decade, print papers with far better dye stability arrived, so a print from 1988 will usually be in noticeably better shape than one from 1981.",
+    "1990s": "Papers and dyes by this point were markedly more stable. A strong cast on a print this recent usually points at how it was stored — heat, damp, or years on a sunny wall — or at the scan itself, rather than at the dyes giving out on their own.",
+    unknown: "The era matters a lot here: a print from the 1950s fails differently from one from the 1970s, because the paper and the dye chemistry changed underneath. Set the decade above and this section will tell you what was specifically wrong with the material your photo was printed on."
+  };
+
+  var STORE = {
+    dark: "Kept in the dark, prints fade in a predictable order — cyan goes first, which pushes the picture toward red and magenta. Dark storage is much gentler than display, but it doesn't stop the process, because dark fading is driven by heat, humidity and leftover chemistry rather than light.",
+    displayed: "A print that hung on a wall took light damage on top of everything else. Displayed prints usually lose yellow and magenta faster than cyan, so they drift cool and go flat overall. If the strip that sat under the frame's mat looks better than the middle, that's your proof of how much the light did.",
+    hot: "An attic, basement or garage is the hardest place a photograph can live. Dye decay roughly doubles with every 10°C rise in temperature, so a few summers in an uninsulated roof space can do more damage than decades in a cupboard — and damp adds staining and mold on top.",
+    unknown: ""
+  };
+
+  /* ---------------- diagnosis ---------------- */
+  var LIGHT = ["red", "green", "blue"];
+  var LAYER = [
+    { key:"c", name:"Cyan layer",    job:"Its only job is to subtract red light." },
+    { key:"m", name:"Magenta layer", job:"Its only job is to subtract green light." },
+    { key:"y", name:"Yellow layer",  job:"Its only job is to subtract blue light." }
+  ];
+  var CAST = {
+    magenta:{ label:"pink-purple", hex:"#C2358B" },
+    amber:  { label:"orange-yellow", hex:"#C99215" },
+    cyan:   { label:"blue-green", hex:"#0F8B9E" },
+    red:    { label:"red", hex:"#C4452F" },
+    green:  { label:"green", hex:"#4E8B3A" },
+    blue:   { label:"blue", hex:"#3B5FA8" },
+    none:   { label:"no strong color cast", hex:"#9E9298" }
+  };
+
+  function castOf(st){
+    var m = st.mean, a = (m[0]+m[1]+m[2])/3;
+    var d = [m[0]-a, m[1]-a, m[2]-a];
+    var strength = Math.max(Math.abs(d[0]), Math.abs(d[1]), Math.abs(d[2]));
+    var key = "none";
+    if(strength >= 3){
+      if(d[0] > 0 && d[2] > 0 && d[1] <= 0) key = "magenta";
+      else if(d[0] > 0 && d[1] > 0 && d[2] <= 0) key = "amber";
+      else if(d[1] > 0 && d[2] > 0 && d[0] <= 0) key = "cyan";
+      else if(d[0] >= d[1] && d[0] >= d[2]) key = "red";
+      else if(d[1] >= d[0] && d[1] >= d[2]) key = "green";
+      else key = "blue";
+    }
+    return { key:key, dev:d, strength:Math.round(strength) };
+  }
+
+  function statusOf(lo, hi){
+    if(lo >= 45) return { cls:"bad", text:"Badly faded" };
+    if(lo >= 20) return { cls:"mid", text:"Fading" };
+    if(hi <= 205) return { cls:"mid", text:"Dulled" };
+    return { cls:"good", text:"Holding up" };
+  }
+
+  function renderDiagnosis(){
+    var st = state.stats;
+    if(!st){ $("castTitle").textContent = "This file could not be measured."; return; }
+
+    var isMono = state.kind === "bw" || (state.kind === "auto" && st.looksMono);
+    if(isMono){ renderMono(); return; }
+
+    $("layersHead").textContent = "The three dye layers";
+    $("layersIntro").innerHTML = "A color print isn't one picture. It's three see-through layers of dye stacked on white paper, and each layer has exactly one job: to subtract one color of light before it bounces back to your eye. The three dyes were never equally stable, so they don't fade at the same rate — and whichever one gives out first decides what color the whole photo drifts toward.";
+
+    var c = castOf(st);
+    var info = CAST[c.key];
+
+    /* headline */
+    $("castChip").style.background = info.hex;
+    $("castTitle").textContent = c.key === "none"
+      ? "The color is close to neutral."
+      : "This photo has drifted " + info.label + ".";
+    $("castSub").textContent = c.key === "none"
+      ? "cast strength: negligible"
+      : "cast strength: " + c.strength + " points off neutral"
+        + (st.saturation < 14 ? " · colors also washed out" : "");
+
+    /* why */
+    var leaking = [0,1,2].filter(function(k){ return c.dev[k] > 0.5; });
+    var why = "";
+
+    if(c.key === "none"){
+      why = "<p>The three layers are close enough to balanced that no single color is taking over. " +
+        (st.saturation < 14
+          ? "What this photo has lost is strength — the colors are all weak together, which is even fading across all three layers rather than one layer giving out first."
+          : "Whatever else needs fixing here, a color cast is not the main problem.") + "</p>";
+    } else {
+      var lightList = leaking.map(function(k){ return LIGHT[k]; });
+      var dyeList = leaking.map(function(k){ return LAYER[k].name.replace(" layer","").toLowerCase(); });
+      var joined = function(arr){ return arr.length > 1 ? arr.slice(0,-1).join(", ") + " and " + arr[arr.length-1] : arr[0]; };
+
+      why = "<p>Too much <strong>" + joined(lightList) + " light</strong> is getting through this print. " +
+        "The <strong>" + joined(dyeList) + "</strong> " + (dyeList.length > 1 ? "layers are" : "layer is") +
+        " what holds that light back, so " + (dyeList.length > 1 ? "those layers have" : "that layer has") + " lost strength. " +
+        "The scan proves it: " + leaking.map(function(k){
+          return LIGHT[k] + " never gets darker than " + st.levels[k][0] + " out of 255";
+        }).join(", and ") + " — instead of dropping to near 0 the way a healthy layer does. " +
+        "That leftover light sits over every part of the picture, including the shadows, and " +
+        (lightList.length > 1 ? joined(lightList) + " together read to your eye as " : "it reads to your eye as ") +
+        info.label + ".</p>";
+
+      if(c.key === "magenta" && (state.era === "1970s" || state.era === "1960s" || state.era === "unknown")){
+        why += "<p class=\"small muted\">A pink-purple shift is the signature of cyan dye loss. It isn't that your photo turned pink — it's that everything except the pink went away, leaving the most stable of the three dyes holding the picture on its own.</p>";
+      } else if(c.key === "amber" || c.key === "red"){
+        why += "<p class=\"small muted\">A warm yellow-orange shift usually means the fading has gone further than a single layer: the print is losing density everywhere and the paper base is often yellowing underneath at the same time, which stacks a second warm tint on top of the first.</p>";
+      }
+    }
+    $("whyBlock").innerHTML = '<p class="why-h">Why it looks this color</p>' + why;
+
+    /* the three layer cards */
+    var host = $("layers");
+    host.innerHTML = "";
+    LAYER.forEach(function(ly, k){
+      var lo = st.levels[k][0], hi = st.levels[k][1], light = LIGHT[k];
+      var s = statusOf(lo, hi);
+      var plain;
+      if(lo >= 20){
+        plain = "The darkest " + light + " anywhere in this photo is <strong>" + lo + " out of 255</strong>, when it should be close to 0. " +
+          "This layer can no longer switch " + light + " off, so a " + light + " haze lies over the whole image — which is why the shadows look murky instead of black.";
+      } else {
+        plain = "The darkest " + light + " reaches <strong>" + lo + "</strong>, so this layer can still shut " + light + " off properly. It has held up.";
+      }
+      if(hi <= 225){
+        plain += " At the bright end it stops at " + hi + ", so the strongest " + light + " never reaches full power either.";
+      }
+
+      var el = document.createElement("div");
+      el.className = "layer";
+      el.innerHTML =
+        '<p class="layer-name">' + ly.name + '</p>' +
+        '<p class="layer-job">' + ly.job + '</p>' +
+        '<span class="status ' + s.cls + '">' + s.text + '</span>' +
+        '<div class="track">' +
+          '<span class="lost" style="left:0;width:0"></span>' +
+          '<span class="fill ' + ly.key + '" style="left:0;right:100%"></span>' +
+          '<span class="lost" style="right:0;width:0"></span>' +
+        '</div>' +
+        '<div class="track-cap"><span>darkest ' + lo + '</span><span>brightest ' + hi + '</span></div>' +
+        '<p class="layer-plain">' + plain + '</p>';
+      host.appendChild(el);
+
+      var lostL = el.querySelectorAll(".lost")[0];
+      var lostR = el.querySelectorAll(".lost")[1];
+      var fill = el.querySelector(".fill");
+      requestAnimationFrame(function(){
+        lostL.style.width = (lo/255*100).toFixed(1) + "%";
+        lostR.style.width = (100 - hi/255*100).toFixed(1) + "%";
+        fill.style.left = (lo/255*100).toFixed(1) + "%";
+        fill.style.right = (100 - hi/255*100).toFixed(1) + "%";
+      });
+    });
+
+    renderEvidence();
+  }
+
+  function renderEvidence(extra){
+    var st = state.stats, hl = st.highlight, sh = st.shadow;
+    var storeText = STORE[state.store] ? '<p class="small" style="max-width:70ch;margin-top:10px">' + STORE[state.store] + '</p>' : "";
+    $("evidence").innerHTML =
+      '<p class="why-h">Checked against neutral</p>' +
+      '<p class="row">brightest areas &nbsp;R ' + hl[0] + ' &nbsp;G ' + hl[1] + ' &nbsp;B ' + hl[2] + '  &nbsp;·&nbsp; should be roughly equal</p>' +
+      '<p class="row">darkest areas &nbsp;&nbsp;R ' + sh[0] + ' &nbsp;G ' + sh[1] + ' &nbsp;B ' + sh[2] + '  &nbsp;·&nbsp; should be roughly equal and near zero</p>' +
+      '<p class="why-h" style="margin-top:20px">What caused it</p>' +
+      '<p class="small" style="max-width:70ch">Three things age a photograph: light, heat and humidity, and chemistry left behind in the paper. Which one did the most damage depends on when it was made and where it has been sitting.</p>' +
+      '<p class="small" style="max-width:70ch;margin-top:10px">' + ERA[state.era] + '</p>' +
+      storeText +
+      (extra || '') +
+      '<p class="small muted" style="margin-top:14px">None of this is damage you caused — most of it was set in motion at the lab counter. And the dye that is gone cannot be brought back: there is no color information left in those areas to recover. What editing does is rescale what survived so the balance reads correctly again. That is what the Rebalanced view is showing you.</p>';
+  }
+
+  function renderMono(){
+    var st = state.stats;
+    $("castChip").style.background = "#8A7A5E";
+    $("castTitle").textContent = "This looks like a black-and-white print, not a color one.";
+    $("castSub").textContent = state.kind === "auto"
+      ? "detected from the scan · change it above if that's wrong"
+      : "set by you";
+
+    $("whyBlock").innerHTML =
+      '<p class="why-h">Why it looks this color</p>' +
+      '<p>All the color in this scan sits in a single tone rather than spreading across many different hues. That is the signature of a monochrome print that has <strong>stained</strong>, not a color print that has faded.</p>' +
+      '<p>A black-and-white print has no dye layers at all. The picture is metallic silver held in gelatin, so nothing can fade the way a dye does. What discolors is the silver itself and the paper around it.</p>';
+
+    $("layersHead").textContent = "What is actually going wrong";
+    $("layersIntro").innerHTML = "Black-and-white prints fail in their own specific ways, and none of them are dye fading. Here is what to look for on the original in your hands.";
+
+    var host = $("layers");
+    host.innerHTML = "";
+    [
+      { n:"Sulfide staining", j:"Yellow-brown discoloration.", p:"Fixer that was never fully washed out slowly converts the silver to silver sulfide, which reads as a yellow-brown stain. It usually shows up worst in the light areas and creeps in from the edges. On fiber-base paper this is very common, because fiber soaks up chemistry and is hard to rinse clean." },
+      { n:"Silver mirroring", j:"A metallic blue sheen.", p:"Silver migrates to the surface of the emulsion over decades and leaves a bluish metallic shine, visible when you tilt the print to the light. It sits in the darkest areas. A scanner will often pick this up as a blue cast in the shadows." },
+      { n:"Base yellowing", j:"The paper itself going cream.", p:"The paper and any mount board behind it yellow with age, and acidic album pages or old glue speed it up sharply. This tints the whole print warm regardless of what the silver image is doing." }
+    ].forEach(function(o){
+      var el = document.createElement("div");
+      el.className = "layer";
+      el.innerHTML =
+        '<p class="layer-name">' + o.n + '</p>' +
+        '<p class="layer-job">' + o.j + '</p>' +
+        '<p class="layer-plain" style="margin-top:0">' + o.p + '</p>';
+      host.appendChild(el);
+    });
+
+    var order = [[0,"red"],[1,"green"],[2,"blue"]].sort(function(a,b){
+      return st.levels[b[0]][1] - st.levels[a[0]][1];
+    });
+    var best = order[0][1];
+
+    renderEvidence(
+      '<p class="why-h" style="margin-top:20px">The trick worth knowing</p>' +
+      '<p class="small" style="max-width:70ch">Don\'t just desaturate a stained black-and-white print — that averages the stain back into the picture. Instead, look at the three color channels separately and keep the cleanest one. On this scan the <strong>' + best + ' channel</strong> carries the most range, so it is the place to start.</p>' +
+      '<div class="howto" style="margin-top:10px">PHOTOSHOP\n  Image &gt; Adjustments &gt; Channel Mixer, tick Monochrome,\n  then push ' + best.charAt(0).toUpperCase() + best.slice(1) + ' to 100 and the other two to 0.\n\nGIMP\n  Colors &gt; Components &gt; Channel Mixer, tick Monochrome,\n  then set ' + best.charAt(0).toUpperCase() + best.slice(1) + ' to 100 and the other two to 0.</div>'
+    );
+  }
+
+  /* ---------------- levels recipe ---------------- */
+  function levelsText(){
+    var st = state.stats;
+    if(!st) return "";
+    var names = ["Red", "Green", "Blue"];
+    var out = [];
+    if(state.app === "gimp"){
+      out.push("GIMP  ·  Colors > Levels");
+      out.push("Set the Channel dropdown, then type into the two Input Levels boxes:");
+    } else {
+      out.push("PHOTOSHOP  ·  Image > Adjustments > Levels   (Ctrl+L)");
+      out.push("Set the Channel dropdown, then type into the outer two Input Levels boxes:");
+    }
+    out.push("");
+    for(var k=0;k<3;k++){
+      var label = (names[k] + "      ").substring(0, 6);
+      out.push("  " + label + "   black " + st.levels[k][0] + "     white " + st.levels[k][1]);
+    }
+    out.push("");
+    out.push("Leave the middle (gamma) box at 1.00 for now.");
+    return out.join("\n");
+  }
+  function renderLevels(){ $("levelsBlock").textContent = levelsText(); }
+
+  /* ---------------- preview ---------------- */
+  function setView(mode){
+    state.view = mode;
+    $("viewOrig").setAttribute("aria-pressed", mode === "orig" ? "true" : "false");
+    $("viewFix").setAttribute("aria-pressed", mode === "fix" ? "true" : "false");
+    paint();
+  }
+  $("viewOrig").addEventListener("click", function(){ setView("orig"); });
+  $("viewFix").addEventListener("click", function(){ setView("fix"); });
+
+  function paint(){
+    var img = state.img;
+    if(!img) return;
+    var MAX = 900;
+    var s = Math.min(1, MAX / Math.max(img.width, img.height));
+    var w = Math.max(1, Math.round(img.width * s)), h = Math.max(1, Math.round(img.height * s));
+    cv.width = w; cv.height = h;
+    ctx.drawImage(img, 0, 0, w, h);
+    if(state.view !== "fix" || !state.stats) return;
+
+    var lut = [];
+    for(var k=0;k<3;k++){
+      var lo = state.stats.levels[k][0], hi = state.stats.levels[k][1], t = new Uint8ClampedArray(256);
+      var range = Math.max(1, hi - lo);
+      for(var v=0; v<256; v++){ t[v] = Math.round(((v - lo) / range) * 255); }
+      lut.push(t);
+    }
+    var d;
+    try { d = ctx.getImageData(0,0,w,h); } catch(e){ return; }
+    var p = d.data;
+    for(var i=0;i<p.length;i+=4){
+      p[i] = lut[0][p[i]]; p[i+1] = lut[1][p[i+1]]; p[i+2] = lut[2][p[i+2]];
+    }
+    ctx.putImageData(d, 0, 0);
+  }
+
+  /* ---------------- shrink for sending ---------------- */
+  function shrink(img){
+    var MAX = 760;
+    var s = Math.min(1, MAX / Math.max(img.width, img.height));
+    var w = Math.max(1, Math.round(img.width * s)), h = Math.max(1, Math.round(img.height * s));
+    var c = document.createElement("canvas"); c.width = w; c.height = h;
+    c.getContext("2d").drawImage(img, 0, 0, w, h);
+    try { return c.toDataURL("image/jpeg", 0.72).split(",")[1]; }
+    catch(e){ return null; }
+  }
+
+  /* ---------------- context controls ---------------- */
+  ["era","store","kind"].forEach(function(id){
+    $(id).addEventListener("change", function(){
+      state[id] = this.value;
+      if(state.stats){
+        renderDiagnosis();
+        state.plan = null;
+        $("results").classList.add("hidden");
+        $("run").textContent = "Write my repair plan";
+      }
+    });
+  });
+
+  /* ---------------- app toggle ---------------- */
+  $("appPS").addEventListener("click", function(){ setApp("photoshop"); });
+  $("appGimp").addEventListener("click", function(){ setApp("gimp"); });
+  function setApp(a){
+    state.app = a;
+    $("appPS").setAttribute("aria-pressed", a === "photoshop" ? "true" : "false");
+    $("appGimp").setAttribute("aria-pressed", a === "gimp" ? "true" : "false");
+    $("appStamp").textContent = a === "gimp" ? "GIMP" : "Photoshop";
+    renderLevels();
+    if(state.plan) renderPlan();
+  }
+
+  /* ---------------- the write-up ---------------- */
+  $("run").addEventListener("click", askClaude);
+
+  function askClaude(){
+    if(!state.b64){ showErr("No image is loaded yet."); return; }
+    hideErr();
+    $("run").disabled = true;
+    $("busy").classList.remove("hidden");
+
+    var st = state.stats;
+    var eraLabel = { unknown:"unknown", pre1950:"before 1950", "1950s":"1950s", "1960s":"1960s",
+                     "1970s":"1970s", "1980s":"1980s", "1990s":"1990s or later" }[state.era];
+    var storeLabel = { unknown:"unknown", dark:"kept in an album, box or drawer",
+                       displayed:"framed or displayed on a wall", hot:"stored in an attic, basement or garage" }[state.store];
+    var kindLabel = state.kind === "bw" ? "black-and-white print"
+                  : state.kind === "color" ? "colour print"
+                  : (st.looksMono ? "probably a black-and-white or toned print, judged from the scan" : "colour print, judged from the scan");
+
+    var facts =
+      "Approximate date taken: " + eraLabel + "\n" +
+      "Storage history: " + storeLabel + "\n" +
+      "Print type: " + kindLabel + "\n" +
+      "Scan size: " + st.w + "x" + st.h + "\n" +
+      "Per-channel input levels measured at 0.2% clip (black, white):\n" +
+      "  Red " + st.levels[0][0] + ", " + st.levels[0][1] + "\n" +
+      "  Green " + st.levels[1][0] + ", " + st.levels[1][1] + "\n" +
+      "  Blue " + st.levels[2][0] + ", " + st.levels[2][1] + "\n" +
+      "Mean RGB: " + st.mean.join(", ") + "\n" +
+      "Darkest 10% mean RGB: " + st.shadow.join(", ") + "\n" +
+      "Brightest 10% mean RGB: " + st.highlight.join(", ") + "\n" +
+      "Mean saturation: " + st.saturation + "%";
+
+    var prompt =
+      "You are a photo restoration technician. A non-technical person is repairing a scanned family print. They have no editing experience.\n\n" +
+      "DETAILS AND MEASUREMENTS:\n" + facts + "\n\n" +
+      "Look at the image and use the measurements. Match your advice to the stated era and print type — a 1950s fiber-base print fails differently from a 1970s resin-coated one, and a black-and-white print has no dye layers at all. Do not assume an era that was not given.\n\n" +
+      "Reply with ONLY a JSON object, no markdown fences, no preamble:\n" +
+      '{"diagnosis":"3 short sentences in plain English: what is wrong and why it happened, correct for the stated era","steps":[{"n":1,"title":"short imperative title","why":"one short sentence","ps":"exact Photoshop menu path and exact values to type","gimp":"exact GIMP menu path and exact values to type","check":"one short sentence on what to look for before moving on"}]}\n\n' +
+      "Rules: 4 to 6 steps maximum. Order them correctly: work on a duplicate layer first, colour cast before contrast, damage retouching after colour, grain and sharpening last. Use the measured numbers verbatim where relevant. Name full menu paths and keyboard shortcuts. Keep every field under 30 words. Do not mention AI tools or plugins they may not have.";
+
+    var body = {
+      model: "claude-sonnet-4-6",
+      max_tokens: 1000,
+      messages: [{
+        role: "user",
+        content: [
+          { type: "image", source: { type: "base64", media_type: "image/jpeg", data: state.b64 } },
+          { type: "text", text: prompt }
+        ]
+      }]
+    };
+
+    fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body)
+    })
+    .then(function(r){ return r.json(); })
+    .then(function(data){
+      var text = (data.content || [])
+        .filter(function(b){ return b.type === "text"; })
+        .map(function(b){ return b.text; })
+        .join("\n");
+      var parsed = lenientJSON(text);
+      if(!parsed || !parsed.steps || !parsed.steps.length) throw new Error("unreadable");
+      state.plan = parsed;
+      renderPlan();
+      $("results").classList.remove("hidden");
+      $("planStamp").textContent = "done";
+      $("run").textContent = "Write it again";
+      $("results").scrollIntoView({behavior:"smooth", block:"start"});
+    })
+    .catch(function(){
+      showErr("The write-up did not come back this time. The numbers above still work on their own — press the button again to retry.");
+    })
+    .then(function(){
+      $("run").disabled = false;
+      $("busy").classList.add("hidden");
+    });
+  }
+
+  function lenientJSON(t){
+    if(!t) return null;
+    var s = t.replace(/```json/g, "").replace(/```/g, "").trim();
+    var a = s.indexOf("{");
+    if(a > 0) s = s.slice(a);
+    try { return JSON.parse(s); } catch(e){}
+    for(var i = s.length; i > 40; i--){
+      if(s[i-1] !== "}") continue;
+      var attempt = s.slice(0, i) + "]}";
+      try { return JSON.parse(attempt); } catch(e2){}
+    }
+    return null;
+  }
+
+  function esc(v){
+    return String(v == null ? "" : v)
+      .replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+  }
+
+  function renderPlan(){
+    var p = state.plan;
+    $("diagnosis").innerHTML = '<h2>What happened to this print</h2><p>' + esc(p.diagnosis) + '</p>';
+    var host = $("steps");
+    host.innerHTML = "";
+    p.steps.forEach(function(s, idx){
+      var body = state.app === "gimp" ? (s.gimp || s.ps) : (s.ps || s.gimp);
+      var el = document.createElement("div");
+      el.className = "step";
+      el.innerHTML =
+        '<span class="step-n">Step ' + (s.n || idx+1) + ' of ' + p.steps.length + '</span>' +
+        '<h3>' + esc(s.title) + '</h3>' +
+        '<p class="small muted">' + esc(s.why) + '</p>' +
+        '<div class="howto">' + esc(body) + '</div>' +
+        (s.check ? '<p class="check small">' + esc(s.check) + '</p>' : "");
+      host.appendChild(el);
+    });
+  }
+
+  /* ---------------- copy + reset ---------------- */
+  function copy(text, btn){
+    var done = function(){
+      var old = btn.textContent;
+      btn.textContent = "Copied";
+      setTimeout(function(){ btn.textContent = old; }, 1600);
+    };
+    if(navigator.clipboard && navigator.clipboard.writeText){
+      navigator.clipboard.writeText(text).then(done, function(){ fallback(text); done(); });
+    } else { fallback(text); done(); }
+  }
+  function fallback(text){
+    var ta = document.createElement("textarea");
+    ta.value = text; ta.style.position = "fixed"; ta.style.opacity = "0";
+    document.body.appendChild(ta); ta.select();
+    try { document.execCommand("copy"); } catch(e){}
+    document.body.removeChild(ta);
+  }
+
+  $("copyLevels").addEventListener("click", function(){ copy(levelsText(), this); });
+  $("copyPlan").addEventListener("click", function(){
+    var p = state.plan;
+    if(!p) return;
+    var lines = [state.name, "", p.diagnosis, ""];
+    p.steps.forEach(function(s, i){
+      lines.push("STEP " + (s.n || i+1) + ": " + s.title);
+      lines.push(s.why || "");
+      lines.push(state.app === "gimp" ? (s.gimp || s.ps) : (s.ps || s.gimp));
+      if(s.check) lines.push("Check: " + s.check);
+      lines.push("");
+    });
+    lines.push(levelsText());
+    copy(lines.join("\n"), this);
+  });
+  $("again").addEventListener("click", function(){
+    fileInput.value = "";
+    fileInput.click();
+  });
+
+  function showErr(m){ var e = $("err"); e.textContent = m; e.classList.remove("hidden"); }
+  function hideErr(){ $("err").classList.add("hidden"); }
+
+})();
+</script>
+</body>
+</html>
