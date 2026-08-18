@@ -165,12 +165,12 @@
   <header class="masthead">
     <p class="eyebrow">Faded print diagnosis · 1940s to now</p>
     <h1>Print Doctor<span class="swatch" style="background:var(--dye-m)"></span></h1>
-    <p class="lede">Drop in a scan of an old photo. This measures what the dye layers have lost, then writes you the exact repair steps — with real numbers to type into Photoshop or GIMP.</p>
+    <p class="lede">Drop in a scan of an old photo. This measures what the dye layers have lost, then writes you the exact repair steps — with real numbers to type into Photoshop or GIMP. Everything runs on your own device — no internet needed once the page is open, and nothing is ever uploaded.</p>
   </header>
 
   <button class="drop" id="drop" type="button">
     <span class="drop-title">Choose a photo</span>
-    <span class="drop-sub">or drag one here · JPG, PNG, TIFF, HEIC · nothing leaves your PC except a small copy sent for the write-up</span>
+    <span class="drop-sub">or drag one here · JPG, PNG, TIFF, HEIC · stays entirely on this device</span>
   </button>
   <input type="file" id="file" accept="image/*" class="hidden">
 
@@ -252,7 +252,7 @@
     <div class="panel">
       <p class="panel-head"><span>Full repair plan</span><span id="planStamp"></span></p>
       <h2>Get the step-by-step</h2>
-      <p class="small muted" style="max-width:60ch">This sends a small copy of the photo plus the measurements above and gets back an ordered repair sequence written for your app. Order matters — color first, damage second, sharpening last.</p>
+      <p class="small muted" style="max-width:60ch">Builds an ordered repair sequence from the measurements above, matched to the app you pick. Order matters — color first, damage second, sharpening last.</p>
       <div class="actions">
         <div class="seg" role="group" aria-label="Which app">
           <button type="button" id="appPS" aria-pressed="true">Photoshop</button>
@@ -285,7 +285,7 @@
 (function(){
   "use strict";
 
-  var state = { img:null, stats:null, name:"", b64:null, app:"photoshop", plan:null, view:"orig",
+  var state = { img:null, stats:null, name:"", app:"photoshop", plan:null, view:"orig",
                 era:"unknown", store:"unknown", kind:"auto" };
 
   var $ = function(id){ return document.getElementById(id); };
@@ -319,7 +319,6 @@
       img.onload = function(){
         state.img = img;
         state.stats = measure(img);
-        state.b64 = shrink(img);
         state.plan = null;
         $("results").classList.add("hidden");
         hideErr();
@@ -706,17 +705,6 @@
     ctx.putImageData(d, 0, 0);
   }
 
-  /* ---------------- shrink for sending ---------------- */
-  function shrink(img){
-    var MAX = 760;
-    var s = Math.min(1, MAX / Math.max(img.width, img.height));
-    var w = Math.max(1, Math.round(img.width * s)), h = Math.max(1, Math.round(img.height * s));
-    var c = document.createElement("canvas"); c.width = w; c.height = h;
-    c.getContext("2d").drawImage(img, 0, 0, w, h);
-    try { return c.toDataURL("image/jpeg", 0.72).split(",")[1]; }
-    catch(e){ return null; }
-  }
-
   /* ---------------- context controls ---------------- */
   ["era","store","kind"].forEach(function(id){
     $(id).addEventListener("change", function(){
@@ -743,99 +731,140 @@
   }
 
   /* ---------------- the write-up ---------------- */
-  $("run").addEventListener("click", askClaude);
+  $("run").addEventListener("click", writePlan);
 
-  function askClaude(){
-    if(!state.b64){ showErr("No image is loaded yet."); return; }
+  function bestChannel(st){
+    var order = [[0,"red"],[1,"green"],[2,"blue"]].sort(function(a,b){
+      return st.levels[b[0]][1] - st.levels[a[0]][1];
+    });
+    return order[0][1];
+  }
+
+  function buildPlan(){
+    var st = state.stats;
+    var isMono = state.kind === "bw" || (state.kind === "auto" && st.looksMono);
+    return isMono ? buildMonoPlan(st) : buildColorPlan(st);
+  }
+
+  function buildColorPlan(st){
+    var c = castOf(st);
+    var eraLabel = { unknown:null, pre1950:"before 1950", "1950s":"1950s", "1960s":"1960s",
+                     "1970s":"1970s", "1980s":"1980s", "1990s":"1990s or later" }[state.era];
+    var steps = [];
+
+    steps.push({ title:"Duplicate the layer before touching anything",
+      why:"Keeps your original scan untouched in case you need to start over.",
+      ps:"Layer > Duplicate Layer, or Ctrl+J. Work only on the copy.",
+      gimp:"Layer > Duplicate Layer. Work only on the copy.",
+      check:"You should now see two layers in the Layers panel." });
+
+    steps.push({ title:"Correct the color cast with Levels",
+      why: c.key === "none"
+        ? "Levels resets each channel's black and white point, which restores punch even without a strong cast."
+        : "This is the move that actually removes the " + CAST[c.key].label + " tint — it's the exact numbers measured from your scan.",
+      ps:"Image > Adjustments > Levels, or Ctrl+L. Pick each channel from the dropdown and set — Red: " + st.levels[0][0] + " to " + st.levels[0][1] + " · Green: " + st.levels[1][0] + " to " + st.levels[1][1] + " · Blue: " + st.levels[2][0] + " to " + st.levels[2][1] + ".",
+      gimp:"Colors > Levels. Pick each channel and set the same three ranges as in the Photoshop step.",
+      check:"The tint should mostly disappear. A little color left over is normal and gets tuned in the next step." });
+
+    if(c.key !== "none"){
+      steps.push({ title:"Fine-tune with Color Balance",
+        why:"Levels rarely lands it perfectly on its own — this nudges what's left.",
+        ps:"Image > Adjustments > Color Balance. Nudge the sliders away from " + CAST[c.key].label + " — check Shadows, Midtones and Highlights separately.",
+        gimp:"Colors > Color Balance. Same nudge, checking Shadows / Midtones / Highlights separately.",
+        check:"Skin tones should look natural rather than still tinted." });
+    }
+
+    steps.push({ title:"Restore contrast",
+      why:"Faded prints lose punch as well as color, so the midtones need pulling apart again.",
+      ps:"Image > Adjustments > Curves, or Ctrl+M. Drag the bottom-left point slightly right and the top-right point slightly left, on the RGB channel.",
+      gimp:"Colors > Curves. Same small adjustment on the Value channel.",
+      check:"The photo should have real depth again, not look flat and gray." });
+
+    steps.push({ title:"Retouch scratches, spots and creases",
+      why:"Doing this after color is fixed means you're looking at real damage, not shapes hidden under a tint.",
+      ps:"Spot Healing Brush (J) for small marks. Clone Stamp (S) for larger creases or tears.",
+      gimp:"Heal Selection tool for small marks. Clone tool (C) for larger creases or tears.",
+      check:"Zoom to 100% and check the corners and edges — that's where damage hides on a scan." });
+
+    steps.push({ title:"Reduce grain, then sharpen last",
+      why:"Sharpening exaggerates grain, so noise reduction always has to come first.",
+      ps:"Filter > Noise > Reduce Noise, moderate strength. Then Filter > Sharpen > Smart Sharpen, moderate amount.",
+      gimp:"Filters > Enhance > Noise Reduction. Then Filters > Enhance > Sharpen (Unsharp Mask), moderate amount.",
+      check:"View at 100% — it should look clean, not plastic-smooth or over-crisp." });
+
+    var diag = c.key === "none"
+      ? "This print has lost overall density rather than drifting toward one color."
+      : "This print has shifted " + CAST[c.key].label + ", caused by uneven fading between the three dye layers.";
+    diag += eraLabel ? " That matches what's expected of a " + eraLabel + " print." : "";
+    diag += " The steps below fix color first, repair physical damage second, and sharpen last — in that order on purpose.";
+
+    steps.forEach(function(s, i){ s.n = i + 1; });
+    return { diagnosis: diag, steps: steps };
+  }
+
+  function buildMonoPlan(st){
+    var best = bestChannel(st);
+    var steps = [];
+
+    steps.push({ title:"Duplicate the layer before touching anything",
+      why:"Keeps your original scan untouched in case you need to start over.",
+      ps:"Layer > Duplicate Layer, or Ctrl+J. Work only on the copy.",
+      gimp:"Layer > Duplicate Layer. Work only on the copy.",
+      check:"You should now see two layers in the Layers panel." });
+
+    steps.push({ title:"Keep the cleanest channel instead of desaturating",
+      why:"Desaturating averages the stain back into the picture. Keeping one clean channel throws the stain color away entirely.",
+      ps:"Image > Adjustments > Channel Mixer, tick Monochrome. Set " + best.charAt(0).toUpperCase() + best.slice(1) + " to 100% and the other two channels to 0%.",
+      gimp:"Colors > Components > Channel Mixer, tick Monochrome. Set " + best.charAt(0).toUpperCase() + best.slice(1) + " to 100 and the other two to 0.",
+      check:"The stain color should be visibly gone or much fainter." });
+
+    steps.push({ title:"Restore contrast with Levels",
+      why:"Stained prints lose their true blacks along with the color, so contrast needs rebuilding.",
+      ps:"Image > Adjustments > Levels, or Ctrl+L. Drag the black-point and white-point sliders inward until the histogram just touches both ends.",
+      gimp:"Colors > Levels. Same — drag the black and white input sliders in to meet the histogram.",
+      check:"You should get a real black and a real white back, not two shades of gray." });
+
+    steps.push({ title:"Retouch scratches, spots and mirroring",
+      why:"With the stain gone, physical damage and silver mirroring are easy to see and fix.",
+      ps:"Spot Healing Brush (J) for small marks. Clone Stamp (S) for larger creases or the metallic sheen of mirroring.",
+      gimp:"Heal Selection tool for small marks. Clone tool (C) for larger creases or mirroring.",
+      check:"Zoom to 100% and check the corners and edges." });
+
+    steps.push({ title:"Reduce grain, then sharpen last",
+      why:"Sharpening exaggerates grain, so noise reduction always has to come first.",
+      ps:"Filter > Noise > Reduce Noise, moderate strength. Then Filter > Sharpen > Smart Sharpen, moderate amount.",
+      gimp:"Filters > Enhance > Noise Reduction. Then Filters > Enhance > Sharpen (Unsharp Mask), moderate amount.",
+      check:"View at 100% — it should look clean, not plastic-smooth or over-crisp." });
+
+    steps.forEach(function(s, i){ s.n = i + 1; });
+    return {
+      diagnosis: "This looks like a black-and-white print that has stained, rather than a color print that has faded — so the fix works on tone, not on removing a color cast. The steps below isolate the cleanest channel first, then repair contrast and damage.",
+      steps: steps
+    };
+  }
+
+  function writePlan(){
+    if(!state.stats){ showErr("No photo is loaded yet."); return; }
     hideErr();
     $("run").disabled = true;
     $("busy").classList.remove("hidden");
 
-    var st = state.stats;
-    var eraLabel = { unknown:"unknown", pre1950:"before 1950", "1950s":"1950s", "1960s":"1960s",
-                     "1970s":"1970s", "1980s":"1980s", "1990s":"1990s or later" }[state.era];
-    var storeLabel = { unknown:"unknown", dark:"kept in an album, box or drawer",
-                       displayed:"framed or displayed on a wall", hot:"stored in an attic, basement or garage" }[state.store];
-    var kindLabel = state.kind === "bw" ? "black-and-white print"
-                  : state.kind === "color" ? "colour print"
-                  : (st.looksMono ? "probably a black-and-white or toned print, judged from the scan" : "colour print, judged from the scan");
-
-    var facts =
-      "Approximate date taken: " + eraLabel + "\n" +
-      "Storage history: " + storeLabel + "\n" +
-      "Print type: " + kindLabel + "\n" +
-      "Scan size: " + st.w + "x" + st.h + "\n" +
-      "Per-channel input levels measured at 0.2% clip (black, white):\n" +
-      "  Red " + st.levels[0][0] + ", " + st.levels[0][1] + "\n" +
-      "  Green " + st.levels[1][0] + ", " + st.levels[1][1] + "\n" +
-      "  Blue " + st.levels[2][0] + ", " + st.levels[2][1] + "\n" +
-      "Mean RGB: " + st.mean.join(", ") + "\n" +
-      "Darkest 10% mean RGB: " + st.shadow.join(", ") + "\n" +
-      "Brightest 10% mean RGB: " + st.highlight.join(", ") + "\n" +
-      "Mean saturation: " + st.saturation + "%";
-
-    var prompt =
-      "You are a photo restoration technician. A non-technical person is repairing a scanned family print. They have no editing experience.\n\n" +
-      "DETAILS AND MEASUREMENTS:\n" + facts + "\n\n" +
-      "Look at the image and use the measurements. Match your advice to the stated era and print type — a 1950s fiber-base print fails differently from a 1970s resin-coated one, and a black-and-white print has no dye layers at all. Do not assume an era that was not given.\n\n" +
-      "Reply with ONLY a JSON object, no markdown fences, no preamble:\n" +
-      '{"diagnosis":"3 short sentences in plain English: what is wrong and why it happened, correct for the stated era","steps":[{"n":1,"title":"short imperative title","why":"one short sentence","ps":"exact Photoshop menu path and exact values to type","gimp":"exact GIMP menu path and exact values to type","check":"one short sentence on what to look for before moving on"}]}\n\n' +
-      "Rules: 4 to 6 steps maximum. Order them correctly: work on a duplicate layer first, colour cast before contrast, damage retouching after colour, grain and sharpening last. Use the measured numbers verbatim where relevant. Name full menu paths and keyboard shortcuts. Keep every field under 30 words. Do not mention AI tools or plugins they may not have.";
-
-    var body = {
-      model: "claude-sonnet-4-6",
-      max_tokens: 1000,
-      messages: [{
-        role: "user",
-        content: [
-          { type: "image", source: { type: "base64", media_type: "image/jpeg", data: state.b64 } },
-          { type: "text", text: prompt }
-        ]
-      }]
-    };
-
-    fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body)
-    })
-    .then(function(r){ return r.json(); })
-    .then(function(data){
-      var text = (data.content || [])
-        .filter(function(b){ return b.type === "text"; })
-        .map(function(b){ return b.text; })
-        .join("\n");
-      var parsed = lenientJSON(text);
-      if(!parsed || !parsed.steps || !parsed.steps.length) throw new Error("unreadable");
-      state.plan = parsed;
-      renderPlan();
-      $("results").classList.remove("hidden");
-      $("planStamp").textContent = "done";
-      $("run").textContent = "Write it again";
-      $("results").scrollIntoView({behavior:"smooth", block:"start"});
-    })
-    .catch(function(){
-      showErr("The write-up did not come back this time. The numbers above still work on their own — press the button again to retry.");
-    })
-    .then(function(){
+    setTimeout(function(){
+      try{
+        state.plan = buildPlan();
+        renderPlan();
+        $("results").classList.remove("hidden");
+        $("planStamp").textContent = "done";
+        $("run").textContent = "Write it again";
+        $("results").scrollIntoView({behavior:"smooth", block:"start"});
+      } catch(e){
+        showErr("The plan could not be built for this photo. Try re-loading it.");
+      }
       $("run").disabled = false;
       $("busy").classList.add("hidden");
-    });
+    }, 200);
   }
 
-  function lenientJSON(t){
-    if(!t) return null;
-    var s = t.replace(/```json/g, "").replace(/```/g, "").trim();
-    var a = s.indexOf("{");
-    if(a > 0) s = s.slice(a);
-    try { return JSON.parse(s); } catch(e){}
-    for(var i = s.length; i > 40; i--){
-      if(s[i-1] !== "}") continue;
-      var attempt = s.slice(0, i) + "]}";
-      try { return JSON.parse(attempt); } catch(e2){}
-    }
-    return null;
-  }
 
   function esc(v){
     return String(v == null ? "" : v)
