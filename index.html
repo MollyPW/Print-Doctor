@@ -392,13 +392,15 @@
 
     var ch = [clip(hist[0], n), clip(hist[1], n), clip(hist[2], n)];
     var loCut = pct(lhist, n, 0.10), hiCut = pct(lhist, n, 0.90);
+    var midLo = pct(lhist, n, 0.40), midHi = pct(lhist, n, 0.60);
 
-    var sh = [0,0,0], shN = 0, hl = [0,0,0], hlN = 0;
+    var sh = [0,0,0], shN = 0, hl = [0,0,0], hlN = 0, md = [0,0,0], mdN = 0;
     for(i=0; i<d.length; i+=4){
       r = d[i]; g = d[i+1]; b = d[i+2];
       l = 0.299*r + 0.587*g + 0.114*b;
       if(l <= loCut){ sh[0]+=r; sh[1]+=g; sh[2]+=b; shN++; }
       else if(l >= hiCut){ hl[0]+=r; hl[1]+=g; hl[2]+=b; hlN++; }
+      if(l >= midLo && l <= midHi){ md[0]+=r; md[1]+=g; md[2]+=b; mdN++; }
     }
     var avg = function(a, k){ return k ? [Math.round(a[0]/k), Math.round(a[1]/k), Math.round(a[2]/k)] : [0,0,0]; };
 
@@ -408,6 +410,7 @@
       mean: [Math.round(sum[0]/n), Math.round(sum[1]/n), Math.round(sum[2]/n)],
       shadow: avg(sh, shN),
       highlight: avg(hl, hlN),
+      midtone: avg(md, mdN),
       saturation: Math.round((sat/n) * 100),
       looksMono: (colouredFrac < 0.10) || (concentration > 0.90)
     };
@@ -761,14 +764,31 @@
     steps.push({ title:"Correct the color cast with Levels",
       why: c.key === "none"
         ? "Levels resets each channel's black and white point, which restores punch even without a strong cast."
-        : "This is the move that actually removes the " + CAST[c.key].label + " tint — it's the exact numbers measured from your scan.",
+        : "This fixes the " + CAST[c.key].label + " tint at its darkest and brightest points — the exact numbers measured from your scan. It won't necessarily fix the middle tones; that's the next step.",
       ps:"Image > Adjustments > Levels, or Ctrl+L. Pick each channel from the dropdown and set — Red: " + st.levels[0][0] + " to " + st.levels[0][1] + " · Green: " + st.levels[1][0] + " to " + st.levels[1][1] + " · Blue: " + st.levels[2][0] + " to " + st.levels[2][1] + ".",
       gimp:"Colors > Levels. Pick each channel and set the same three ranges as in the Photoshop step.",
-      check:"The tint should mostly disappear. A little color left over is normal and gets tuned in the next step." });
+      check:"The darkest and brightest parts of the photo should look close to neutral now. Color sitting in the mid-brightness areas is normal at this point." });
+
+    var mid = st.midtone, avgMid = (mid[0]+mid[1]+mid[2])/3;
+    var midDev = [mid[0]-avgMid, mid[1]-avgMid, mid[2]-avgMid];
+    var midOff = [0,1,2].filter(function(k){ return Math.abs(midDev[k]) >= 5; });
+
+    if(midOff.length){
+      var names = ["Red","Green","Blue"];
+      var lines = midOff.map(function(k){
+        var dir = midDev[k] > 0 ? "down" : "up";
+        return names[k] + ": pick input around " + Math.round(mid[k]) + ", drag it " + dir + " toward " + Math.round(avgMid) + ".";
+      });
+      steps.push({ title:"Fix leftover color in the midtones with Curves",
+        why:"Levels only moves two points — pure black and pure white. If a dye faded unevenly, a cast can sit in the middle of the tonal range where Levels can't reach it. Curves lets you grab that exact spot.",
+        ps:"Image > Adjustments > Curves, or Ctrl+M. On each channel below, click a point roughly in the middle of the line and drag: " + lines.join(" "),
+        gimp:"Colors > Curves. Same channels and points as the Photoshop step: " + lines.join(" "),
+        check:"Find something in the photo that should be a plain neutral gray — pavement, a fence post, a gray shirt — and watch it as you drag. Stop once that spot looks gray instead of tinted, using it as your guide rather than the exact numbers above." });
+    }
 
     if(c.key !== "none"){
       steps.push({ title:"Fine-tune with Color Balance",
-        why:"Levels rarely lands it perfectly on its own — this nudges what's left.",
+        why:"A last, gentler pass to settle anything Levels and Curves didn't fully catch.",
         ps:"Image > Adjustments > Color Balance. Nudge the sliders away from " + CAST[c.key].label + " — check Shadows, Midtones and Highlights separately.",
         gimp:"Colors > Color Balance. Same nudge, checking Shadows / Midtones / Highlights separately.",
         check:"Skin tones should look natural rather than still tinted." });
