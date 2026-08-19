@@ -1,7 +1,7 @@
 # Print Doctor
 
 A browser-based tool for diagnosing why an old family photo has faded or shifted color, and generating exact step-by-step repair instructions for Photoshop or GIMP.
-https://mollypw.github.io/Print-Doctor/
+[https://mollypw.github.io/Print-Doctor/](https://mollypw.github.io/Print-Doctor/)
 
 ## What it does
 
