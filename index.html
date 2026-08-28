@@ -6,27 +6,42 @@
 <title>Print Doctor — faded photo diagnosis</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,800&family=Instrument+Sans:wght@400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@600;700;800&family=DM+Sans:wght@400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
   :root{
-    --paper:#F2EBEC;
-    --paper-deep:#E7DBDE;
-    --ink:#1B1418;
-    --ink-soft:#5C4E53;
-    --rule:#CBB8BD;
+    /* brand tokens — the only six colors this build draws from,
+       plus documented functional exceptions (see notes at point of use) */
+    --navy:#1D3557;
+    --red:#E63946;
+    --steel:#457B9D;
+    --teal:#A8DADC;
+    --offwhite:#F1FAEE;
+    --gold:#C9A227;
+    --white:#FFFFFF;
+
+    /* muted text sitting directly on the offwhite base (not a white card) —
+       steel blue fails AA there, so this is navy at reduced opacity instead
+       of a new hue, per the brand system's rule for interactive-state tints */
+    --navy-soft:rgba(29,53,87,.68);
+    --rule:rgba(29,53,87,.16);
+
+    /* functional exception, not a brand choice: these three represent the
+       real cyan/magenta/yellow print dyes the tool is measuring. Recoloring
+       them to brand tokens would misrepresent the photo chemistry the app
+       explains, so they stay tied to the actual dye colors. */
     --dye-c:#0F8B9E;
     --dye-m:#C2358B;
     --dye-y:#C99215;
-    --ok:#2E7D5B;
-    --display:"Bricolage Grotesque","Arial Black",system-ui,sans-serif;
-    --body:"Instrument Sans","Segoe UI",system-ui,sans-serif;
+
+    --display:"Poppins","Arial Black",system-ui,sans-serif;
+    --body:"DM Sans","Segoe UI",system-ui,sans-serif;
     --mono:"DM Mono","Consolas",ui-monospace,monospace;
   }
   *{box-sizing:border-box}
   html,body{margin:0;padding:0}
   body{
-    background:var(--paper);
-    color:var(--ink);
+    background:var(--offwhite);
+    color:var(--navy);
     font-family:var(--body);
     font-size:16px;
     line-height:1.55;
@@ -35,136 +50,159 @@
   .wrap{max-width:940px;margin:0 auto;padding:32px 20px 96px}
 
   /* ---------- header ---------- */
-  .masthead{border-bottom:2px solid var(--ink);padding-bottom:18px;margin-bottom:34px}
+  /* eyebrow/lede sit directly on the offwhite base, not a white card, so
+     they use navy-soft rather than steel (steel fails AA on offwhite) */
+  .masthead{border-bottom:2px solid var(--navy);padding-bottom:18px;margin-bottom:34px}
   .eyebrow{
     font-family:var(--mono);font-size:11px;letter-spacing:.16em;text-transform:uppercase;
-    color:var(--ink-soft);margin:0 0 10px
+    color:var(--navy-soft);margin:0 0 10px
   }
   h1{
-    font-family:var(--display);font-weight:800;font-size:clamp(38px,7vw,68px);
-    line-height:.92;letter-spacing:-.03em;margin:0 0 12px;
+    font-family:var(--display);font-weight:800;font-size:clamp(38px,7vw,64px);
+    line-height:.98;letter-spacing:-.02em;margin:0 0 12px;color:var(--navy);
   }
   h1 .swatch{display:inline-block;width:.42em;height:.42em;border-radius:50%;vertical-align:.06em;margin-left:.08em}
-  .lede{max-width:56ch;margin:0;color:var(--ink-soft);font-size:17px}
+  .lede{max-width:56ch;margin:0;color:var(--navy-soft);font-size:17px}
 
   /* ---------- generic blocks ---------- */
   .panel{
-    background:#fff;border:1px solid var(--rule);border-radius:2px;
+    background:var(--white);border:1px solid var(--rule);border-radius:2px;
     padding:22px;margin-bottom:20px
   }
   .panel-head{
     font-family:var(--mono);font-size:11px;letter-spacing:.16em;text-transform:uppercase;
-    color:var(--ink-soft);margin:0 0 16px;display:flex;justify-content:space-between;gap:12px;align-items:baseline
+    color:var(--steel);margin:0 0 16px;display:flex;justify-content:space-between;gap:12px;align-items:baseline
   }
-  h2{font-family:var(--display);font-weight:800;font-size:26px;letter-spacing:-.02em;margin:0 0 10px;line-height:1.1}
-  h3{font-family:var(--display);font-weight:500;font-size:19px;letter-spacing:-.01em;margin:0 0 6px;line-height:1.2}
+  h2{font-family:var(--display);font-weight:800;font-size:26px;letter-spacing:-.02em;margin:0 0 10px;line-height:1.1;color:var(--navy)}
+  h3{font-family:var(--display);font-weight:600;font-size:19px;letter-spacing:-.01em;margin:0 0 6px;line-height:1.2;color:var(--navy)}
   p{margin:0 0 12px}
-  .muted{color:var(--ink-soft)}
+  .muted{color:var(--steel)}
   .small{font-size:14px}
 
   /* ---------- drop zone ---------- */
   .drop{
-    border:2px dashed var(--rule);border-radius:3px;background:#fff;
+    border:2px dashed var(--rule);border-radius:3px;background:var(--white);
     padding:52px 24px;text-align:center;cursor:pointer;display:block;width:100%;
     font:inherit;color:inherit;transition:border-color .18s,background .18s
   }
-  .drop:hover,.drop:focus-visible{border-color:var(--dye-m);background:#fffdfe}
-  .drop.over{border-color:var(--dye-m);background:#FCF3F8}
-  .drop-title{font-family:var(--display);font-weight:800;font-size:24px;letter-spacing:-.02em;display:block;margin-bottom:8px}
-  .drop-sub{color:var(--ink-soft);font-size:15px}
+  .drop:hover,.drop:focus-visible{border-color:var(--steel);background:var(--offwhite)}
+  .drop.over{border-color:var(--navy);background:rgba(168,218,220,.35)}
+  .drop-title{font-family:var(--display);font-weight:800;font-size:24px;letter-spacing:-.02em;display:block;margin-bottom:8px;color:var(--navy)}
+  .drop-sub{color:var(--steel);font-size:15px}
 
   /* ---------- image frame ---------- */
   .exam{display:grid;grid-template-columns:1fr 1fr;gap:20px;align-items:start}
   @media (max-width:760px){.exam{grid-template-columns:1fr}}
-  .frame{background:#fff;border:1px solid var(--rule);padding:12px 12px 0;border-radius:2px}
-  .frame canvas{display:block;width:100%;height:auto;background:var(--paper-deep)}
+  .frame{background:var(--white);border:1px solid var(--rule);padding:12px 12px 0;border-radius:2px}
+  .frame canvas{display:block;width:100%;height:auto;background:var(--teal)}
   .frame-bar{display:flex;gap:6px;padding:12px 0;align-items:center;flex-wrap:wrap}
-  .seg{display:inline-flex;border:1px solid var(--ink);border-radius:2px;overflow:hidden}
+  .seg{display:inline-flex;border:1px solid var(--navy);border-radius:2px;overflow:hidden}
   .seg button{
     font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;
-    background:#fff;border:0;padding:8px 12px;cursor:pointer;color:var(--ink)
+    background:var(--white);border:0;padding:8px 12px;cursor:pointer;color:var(--navy)
   }
-  .seg button[aria-pressed="true"]{background:var(--ink);color:var(--paper)}
-  .filename{font-family:var(--mono);font-size:11px;color:var(--ink-soft);margin-left:auto;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%}
+  .seg button[aria-pressed="true"]{background:var(--navy);color:var(--offwhite)}
+  .filename{font-family:var(--mono);font-size:11px;color:var(--steel);margin-left:auto;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%}
 
   /* ---------- context controls ---------- */
   .ctx{display:grid;grid-template-columns:1fr 1fr;gap:12px;padding-bottom:18px;margin-bottom:18px;border-bottom:1px solid var(--rule)}
   @media (max-width:560px){.ctx{grid-template-columns:1fr}}
-  .ctx label{display:block;font-family:var(--mono);font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-soft);margin-bottom:5px}
+  .ctx label{display:block;font-family:var(--mono);font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--steel);margin-bottom:5px}
   .ctx select{
-    width:100%;font-family:var(--body);font-size:14.5px;color:var(--ink);background:#fff;
+    width:100%;font-family:var(--body);font-size:14.5px;color:var(--navy);background:var(--white);
     border:1px solid var(--rule);border-radius:2px;padding:9px 10px;cursor:pointer
   }
-  .ctx select:hover{border-color:var(--ink)}
+  .ctx select:hover{border-color:var(--navy)}
   .ctx .full{grid-column:1/-1}
 
   /* ---------- diagnosis (signature) ---------- */
   .verdict-head{display:flex;gap:14px;align-items:flex-start;margin-bottom:16px}
-  .cast-chip{width:48px;height:48px;border-radius:2px;flex:0 0 auto;border:1px solid rgba(0,0,0,.18)}
-  .verdict-title{font-family:var(--display);font-weight:800;font-size:23px;line-height:1.12;letter-spacing:-.02em;margin:0}
-  .verdict-sub{font-family:var(--mono);font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-soft);margin:7px 0 0}
-  .why-h{font-family:var(--mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-soft);margin:0 0 6px}
+  /* cast-chip shows the photo's ACTUAL measured tint color — a content-
+     accurate readout, not a brand color, so it isn't restricted to the
+     6 tokens (same reasoning as the dye-c/m/y swatches above) */
+  .cast-chip{width:48px;height:48px;border-radius:2px;flex:0 0 auto;border:1px solid rgba(29,53,87,.25)}
+  .verdict-title{font-family:var(--display);font-weight:800;font-size:23px;line-height:1.12;letter-spacing:-.02em;margin:0;color:var(--navy)}
+  .verdict-sub{font-family:var(--mono);font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--steel);margin:7px 0 0}
+  .why-h{font-family:var(--mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--steel);margin:0 0 6px}
 
   .layers{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
   @media (max-width:760px){.layers{grid-template-columns:1fr}}
   .layer{border:1px solid var(--rule);border-radius:2px;padding:16px}
-  .layer-name{font-family:var(--display);font-weight:800;font-size:17px;margin:0 0 3px;letter-spacing:-.01em}
-  .layer-job{font-size:13.5px;color:var(--ink-soft);margin:0 0 12px}
-  .status{font-family:var(--mono);font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;padding:4px 8px;border-radius:2px;display:inline-block;margin-bottom:14px}
-  .status.bad{background:#F7E3EE;color:#96256B}
-  .status.mid{background:#FBF0DC;color:#8A6110}
-  .status.good{background:#E2F0E9;color:var(--ok)}
-  .track{position:relative;height:14px;background:#fff;border:1px solid var(--rule);border-radius:1px;overflow:hidden}
-  .lost{position:absolute;top:0;bottom:0;background:repeating-linear-gradient(45deg,#D9CACE,#D9CACE 3px,#F0E6E8 3px,#F0E6E8 6px)}
+  .layer-name{font-family:var(--display);font-weight:800;font-size:17px;margin:0 0 3px;letter-spacing:-.01em;color:var(--navy)}
+  .layer-job{font-size:13.5px;color:var(--steel);margin:0 0 12px}
+  /* Status pills: the word itself always carries the meaning (never
+     color-only). The dot is a brand-token accent, not a new semantic
+     color — filled red = concern, filled teal = healthy, hollow navy =
+     in between — so no invented amber/green enters the palette. */
+  .status{font-family:var(--mono);font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;
+    display:inline-flex;align-items:center;gap:6px;margin-bottom:14px;color:var(--navy)}
+  .status::before{content:"";width:8px;height:8px;border-radius:50%;flex:0 0 auto}
+  .status.bad::before{background:var(--red)}
+  .status.mid::before{background:var(--white);border:2px solid var(--navy)}
+  .status.good::before{background:var(--teal);border:1px solid var(--navy)}
+  .track{position:relative;height:14px;background:var(--white);border:1px solid var(--rule);border-radius:1px;overflow:hidden}
+  .lost{position:absolute;top:0;bottom:0;background:repeating-linear-gradient(45deg,var(--rule),var(--rule) 3px,var(--offwhite) 3px,var(--offwhite) 6px)}
   .fill{position:absolute;top:0;bottom:0;transition:left .7s cubic-bezier(.2,.8,.2,1),right .7s cubic-bezier(.2,.8,.2,1)}
   .fill.c{background:var(--dye-c)} .fill.m{background:var(--dye-m)} .fill.y{background:var(--dye-y)}
-  .track-cap{display:flex;justify-content:space-between;font-family:var(--mono);font-size:10px;color:var(--ink-soft);margin-top:5px}
+  .track-cap{display:flex;justify-content:space-between;font-family:var(--mono);font-size:10px;color:var(--steel);margin-top:5px}
   .layer-plain{font-size:14px;line-height:1.55;margin:12px 0 0}
   .evidence{margin-top:24px;border-top:1px solid var(--rule);padding-top:18px}
-  .evidence .row{font-family:var(--mono);font-size:12.5px;color:var(--ink-soft);margin-bottom:6px}
+  .evidence .row{font-family:var(--mono);font-size:12.5px;color:var(--steel);margin-bottom:6px}
 
   /* ---------- recipe cards ---------- */
   .step{border-top:1px solid var(--rule);padding:20px 0}
   .step:first-of-type{border-top:0;padding-top:4px}
   .step-n{
-    font-family:var(--mono);font-size:11px;letter-spacing:.14em;color:var(--dye-m);
+    font-family:var(--mono);font-size:11px;letter-spacing:.14em;color:var(--red);
     display:block;margin-bottom:6px
   }
   .howto{
-    background:var(--paper);border-left:3px solid var(--ink);padding:12px 14px;margin-top:10px;
-    font-family:var(--mono);font-size:13.5px;line-height:1.6;white-space:pre-wrap
+    background:var(--offwhite);border-left:3px solid var(--navy);padding:12px 14px;margin-top:10px;
+    font-family:var(--mono);font-size:13.5px;line-height:1.6;white-space:pre-wrap;color:var(--navy)
   }
-  .check{margin-top:8px;font-size:14px;color:var(--ok)}
-  .check::before{content:"→ ";font-family:var(--mono)}
+  /* the arrow is a small icon accent (3:1 threshold, not 4.5:1) so red is
+     fine here even at small size; the sentence itself stays navy */
+  .check{margin-top:8px;font-size:14px;color:var(--navy)}
+  .check::before{content:"→ ";font-family:var(--mono);color:var(--red)}
 
   /* ---------- buttons ---------- */
   .btn{
     font-family:var(--display);font-weight:800;font-size:16px;letter-spacing:-.01em;
-    background:var(--ink);color:var(--paper);border:0;border-radius:2px;
+    background:var(--navy);color:var(--offwhite);border:0;border-radius:2px;
     padding:14px 22px;cursor:pointer;transition:transform .1s
   }
   .btn:hover{transform:translateY(-1px)}
   .btn:disabled{opacity:.45;cursor:not-allowed;transform:none}
-  .btn.ghost{background:transparent;color:var(--ink);border:1px solid var(--ink);font-weight:500;font-size:14px;padding:10px 16px}
+  .btn.ghost{background:transparent;color:var(--navy);border:1px solid var(--navy);font-weight:500;font-size:14px;padding:10px 16px}
   .actions{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:6px}
-  :focus-visible{outline:2px solid var(--dye-m);outline-offset:2px}
+  /* focus ring is brand navy, not a browser default — visible on every
+     light background used in this build. Elements that already have a
+     navy fill (buttons, pressed toggles) switch to gold instead, since
+     a navy ring on a navy background would be invisible. */
+  :focus-visible{outline:2px solid var(--navy);outline-offset:2px}
+  .btn:focus-visible,
+  .seg button[aria-pressed="true"]:focus-visible{outline-color:var(--gold)}
 
   .hidden{display:none !important}
-  .note{font-size:13.5px;color:var(--ink-soft);margin-top:10px}
-  .err{border-left:3px solid var(--dye-m);padding:10px 14px;background:#fff;font-size:14px}
-  .loading{font-family:var(--mono);font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-soft)}
+  .note{font-size:13.5px;color:var(--steel);margin-top:10px}
+  .err{border-left:3px solid var(--red);padding:10px 14px;background:var(--white);font-size:14px;color:var(--navy)}
+  .loading{font-family:var(--mono);font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--steel)}
   .dots::after{content:"";animation:d 1.2s steps(4,end) infinite}
   @keyframes d{0%{content:""}25%{content:"."}50%{content:".."}75%{content:"..."}}
   @media (prefers-reduced-motion:reduce){*{animation:none !important;transition:none !important}}
-  footer{margin-top:40px;padding-top:16px;border-top:1px solid var(--rule);font-size:13px;color:var(--ink-soft)}
+  footer{margin-top:40px;padding-top:16px;border-top:1px solid var(--rule);font-size:13px;color:var(--navy-soft)}
+
+  /* ---------- signature mark ---------- */
+  .sig{position:fixed;right:24px;bottom:24px;width:44px;height:44px;pointer-events:none;opacity:.9}
+  @media (max-width:560px){.sig{width:34px;height:34px;right:16px;bottom:16px}}
 </style>
 </head>
 <body>
-<div class="wrap">
+<main class="wrap">
 
   <header class="masthead">
     <p class="eyebrow">Faded print diagnosis · 1940s to now</p>
-    <h1>Print Doctor<span class="swatch" style="background:var(--dye-m)"></span></h1>
+    <h1>Print Doctor<span class="swatch" style="background:var(--red)"></span></h1>
     <p class="lede">Drop in a scan of an old photo. This measures what the dye layers have lost, then writes you the exact repair steps — with real numbers to type into Photoshop or GIMP. Everything runs on your own device — no internet needed once the page is open, and nothing is ever uploaded.</p>
   </header>
 
@@ -279,7 +317,17 @@
   <footer>
     Preview rendering is a rough guide at screen size only. Do the real edit on the full-resolution file in your photo app, and always work on a copy — never the original scan.
   </footer>
-</div>
+</main>
+
+<svg class="sig" viewBox="0 0 240 240" fill="none" stroke="#C9A227" stroke-width="1" aria-hidden="true">
+  <g stroke-linecap="round" stroke-linejoin="round">
+    <circle cx="119" cy="137" r="99" stroke-width="1.5"></circle>
+    <path d="M74 172 V80 C74 66 90 64 98 76 L120 112 L142 76 C150 64 166 66 166 80 V172" stroke-width="10"></path>
+    <path d="M74 104 H46 M74 133 H58 M74 162 H46" stroke-width="6"></path>
+    <path d="M166 104 H184 C196 104 196 130 184 130 H166" stroke-width="6"></path>
+    <path d="M62 188 C74 212 94 212 104 190 C112 172 128 172 136 190 C146 212 166 212 178 188" stroke-width="6"></path>
+  </g>
+</svg>
 
 <script>
 (function(){
@@ -644,7 +692,7 @@
     renderEvidence(
       '<p class="why-h" style="margin-top:20px">The trick worth knowing</p>' +
       '<p class="small" style="max-width:70ch">Don\'t just desaturate a stained black-and-white print — that averages the stain back into the picture. Instead, look at the three color channels separately and keep the cleanest one. On this scan the <strong>' + best + ' channel</strong> carries the most range, so it is the place to start.</p>' +
-      '<div class="howto" style="margin-top:10px">PHOTOSHOP\n  Image &gt; Adjustments &gt; Channel Mixer, tick Monochrome,\n  then push ' + best.charAt(0).toUpperCase() + best.slice(1) + ' to 100 and the other two to 0.\n\nGIMP\n  Colors &gt; Components &gt; Channel Mixer, tick Monochrome,\n  then set ' + best.charAt(0).toUpperCase() + best.slice(1) + ' to 100 and the other two to 0.</div>'
+      '<div class="howto" style="margin-top:10px">PHOTOSHOP\n  Image &gt; Adjustments &gt; Channel Mixer, tick Monochrome,\n  then push ' + best.charAt(0).toUpperCase() + best.slice(1) + ' to 100 and the other two to 0.\n\nGIMP\n  Colors &gt; Desaturate &gt; Extract Component,\n  then set Component to "RGB ' + best.charAt(0).toUpperCase() + best.slice(1) + '" and click OK.</div>'
     );
   }
 
@@ -803,7 +851,7 @@
     steps.push({ title:"Retouch scratches, spots and creases",
       why:"Doing this after color is fixed means you're looking at real damage, not shapes hidden under a tint.",
       ps:"Spot Healing Brush (J) for small marks. Clone Stamp (S) for larger creases or tears.",
-      gimp:"Heal Selection tool for small marks. Clone tool (C) for larger creases or tears.",
+      gimp:"Heal tool (H) for small marks. Clone tool (C) for larger creases or tears.",
       check:"Zoom to 100% and check the corners and edges — that's where damage hides on a scan." });
 
     steps.push({ title:"Reduce grain, then sharpen last",
@@ -835,7 +883,7 @@
     steps.push({ title:"Keep the cleanest channel instead of desaturating",
       why:"Desaturating averages the stain back into the picture. Keeping one clean channel throws the stain color away entirely.",
       ps:"Image > Adjustments > Channel Mixer, tick Monochrome. Set " + best.charAt(0).toUpperCase() + best.slice(1) + " to 100% and the other two channels to 0%.",
-      gimp:"Colors > Components > Channel Mixer, tick Monochrome. Set " + best.charAt(0).toUpperCase() + best.slice(1) + " to 100 and the other two to 0.",
+      gimp:"Colors > Desaturate > Extract Component. In the Component dropdown choose \"RGB " + best.charAt(0).toUpperCase() + best.slice(1) + "\", then click OK.",
       check:"The stain color should be visibly gone or much fainter." });
 
     steps.push({ title:"Restore contrast with Levels",
@@ -847,7 +895,7 @@
     steps.push({ title:"Retouch scratches, spots and mirroring",
       why:"With the stain gone, physical damage and silver mirroring are easy to see and fix.",
       ps:"Spot Healing Brush (J) for small marks. Clone Stamp (S) for larger creases or the metallic sheen of mirroring.",
-      gimp:"Heal Selection tool for small marks. Clone tool (C) for larger creases or mirroring.",
+      gimp:"Heal tool (H) for small marks. Clone tool (C) for larger creases or mirroring.",
       check:"Zoom to 100% and check the corners and edges." });
 
     steps.push({ title:"Reduce grain, then sharpen last",
